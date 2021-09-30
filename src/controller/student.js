@@ -1,5 +1,6 @@
 const Student = require('../models/student');
 const Course = require('../models/course');
+const student = require('../models/student');
 
 async function getAllStudents(req,res){
     const students = await Student.find().exec();
@@ -9,7 +10,7 @@ async function getAllStudents(req,res){
 
 async function getStudentById(req,res){
     const {id} = req.params;
-    const student = await Student.findById(id).exec();
+    const student = await Student.findById(id).populate('courses','name').exec();//populate取关联数据
     if(!student){
         return res.sendStatus(404);
     }
@@ -34,6 +35,19 @@ async function deleteStudentById(req,res){
     if(!deleteStudent){
         return res.sendStatus(404);
     }
+    await Course.updateMany(
+        // {
+        //     _id:{ $in: student.courses }
+        // },
+        {
+            students: student._id
+        },
+        {
+            $pull:{
+                students: student._id
+            }
+        }
+    )
     return res.json(deleteStudent);
 }
 
@@ -57,19 +71,24 @@ async function addStudentToCourse(req,res){
     }
     student.courses.addToSet(course._id);
     course.students.addToSet(student._id);
-    await student.save();
+    await student.save();//SAVE（）时自动检查；validate
     await course.save();
     return res.json(student);
 }
 
 async function removeStudentToCourse(req,res){
-    // const {id, code} = req.params;
-    // const student = await Student.findById(id).exec();
-    // const course = await Course.findById(code).exec();
-    // if(!student ||!course){
-    //     return res.sendStatus(404);
-    // }
-    // return res.json(student);
+    const {id,code} = req.params;
+    const student = await Student.findById(id).exec();
+    const course = await Course.findById(code).exec();
+    console.log(student);
+    if(!student || !course){
+        return res.sendStatus(404);
+    }
+    student.courses.pull(course._id);
+    course.students.pull(student._id);
+    await student.save();
+    await course.save();
+    return res.json(student);
 
 }
 
